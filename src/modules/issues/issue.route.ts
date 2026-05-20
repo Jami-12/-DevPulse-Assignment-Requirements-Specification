@@ -1,0 +1,16 @@
+import express from "express";
+import { auth } from "../../middleware/auth";
+import { roleCheck } from "../../middleware/role";
+import { userController } from "./issue.controller";
+
+
+
+const router = express.Router();
+
+router.post("/", auth, userController.createIssue);
+router.get("/", auth, userController.getAllIssues);
+router.get("/:id", auth, userController.getSingleIssue);
+router.patch("/:id", auth, userController.updateIssue);
+router.delete("/:id", auth, roleCheck("maintainer"), userController.deleteIssue);
+
+export const issueRouter = router;
