@@ -1,47 +1,54 @@
 import bcrypt from "bcrypt";
-import type { IUser } from "./auth.interface";
-import { pool } from "../../db/db";
 import jwt from "jsonwebtoken";
+import { pool } from "../../db/db";
 import config from "../../config";
+import type { IUser } from "./auth.interface";
 
 const createUser = async (payload: IUser) => {
-  const { name, email, password, role } = payload;
-
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashed = await bcrypt.hash(payload.password, 10);
 
   const result = await pool.query(
-    `INSERT INTO users (name, email, password, role)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, name, email, role`,
-    [name, email, hashedPassword, role || "contributor"],
+    `
+    INSERT INTO users (name, email, password, role)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, name, email, role, created_at, updated_at
+    `,
+    [
+      payload.name,
+      payload.email,
+      hashed,
+      payload.role || "contributor",
+    ]
   );
 
   return result.rows[0];
 };
 
 const loginUser = async (email: string, password: string) => {
-  const userResult = await pool.query(`SELECT * FROM users WHERE email = $1`, [
-    email,
-  ]);
+  const userResult = await pool.query(
+    `SELECT * FROM users WHERE email = $1`,
+    [email]
+  );
 
   const user = userResult.rows[0];
 
-  if (!user) {
-    throw new Error("User not found");
-  }
-  const isMatch = await bcrypt.compare(password, user.password);
+  if (!user) throw new Error("User not found");
 
-  if (!isMatch) {
-    throw new Error("Invalid password");
-  }
+  const match = await bcrypt.compare(
+    password,
+    user.password
+  );
+
+  if (!match) throw new Error("Invalid password");
+
   const token = jwt.sign(
     {
       id: user.id,
-      email: user.email,
+      name: user.name,
       role: user.role,
     },
-    config.jwt_secret as string,
-    { expiresIn: "1d" },
+    config.jwt_secret,
+    { expiresIn: "1d" }
   );
 
   return {

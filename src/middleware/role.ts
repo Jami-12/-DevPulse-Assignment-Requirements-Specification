@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 export const roleCheck = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {

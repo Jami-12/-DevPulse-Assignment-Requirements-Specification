@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { issueService } from "./issue.service";
 
-
 const createIssue = async (req: Request, res: Response) => {
   const user = (req as any).user;
 
@@ -10,7 +9,7 @@ const createIssue = async (req: Request, res: Response) => {
     reporter_id: user.id,
   });
 
-  res.json({
+  res.status(201).json({
     success: true,
     message: "Issue created successfully",
     data: issue,
@@ -18,21 +17,22 @@ const createIssue = async (req: Request, res: Response) => {
 };
 
 const getAllIssues = async (req: Request, res: Response) => {
-  const issues = await issueService.getAllIssuesFromDB(req.query);
+  const data = await issueService.getAllIssuesFromDB(
+    req.query
+  );
 
   res.json({
     success: true,
-    message: "All issues fetched successfully",
-    data: issues,
+    data,
   });
 };
 
 const getSingleIssue = async (req: Request, res: Response) => {
-  const id = req.params.id;
+  const data = await issueService.getSingleIssueFromDB(
+    req.params.id as string
+  );
 
-  const issue = await issueService.getSingleIssueFromDB(id as string);
-
-  if (!issue) {
+  if (!data) {
     return res.status(404).json({
       success: false,
       message: "Issue not found",
@@ -41,16 +41,16 @@ const getSingleIssue = async (req: Request, res: Response) => {
 
   res.json({
     success: true,
-    message: "Single issue fetched successfully",
-    data: issue,
+    data,
   });
 };
 
 const updateIssue = async (req: Request, res: Response) => {
   const user = (req as any).user;
-  const id = req.params.id;
 
-  const issue = await issueService.getSingleIssueFromDB(id as string);
+  const issue = await issueService.getSingleIssueFromDB(
+    req.params.id as string
+  );
 
   if (!issue) {
     return res.status(404).json({
@@ -59,19 +59,23 @@ const updateIssue = async (req: Request, res: Response) => {
     });
   }
 
-  if (user.role === "contributor" && issue.reporter_id !== user.id) {
+  if (
+    user.role === "contributor" &&
+    (issue.reporter_id !== user.id ||
+      issue.status !== "open")
+  ) {
     return res.status(403).json({
       success: false,
-      message: "You can only update your own issue",
+      message:
+        "You can only update your own open issues",
     });
   }
 
-  console.log(req.body);
-
-  const updated = await issueService.updateIssueIntoDB(
-    id as string,
-    req.body
-  );
+  const updated =
+    await issueService.updateIssueIntoDB(
+      req.params.id as string,
+      req.body
+    );
 
   res.json({
     success: true,
@@ -79,10 +83,9 @@ const updateIssue = async (req: Request, res: Response) => {
     data: updated,
   });
 };
-const deleteIssue = async (req: Request, res: Response) => {
-  const id = req.params.id;
 
-  await issueService.deleteIssueFromDB(id as string);
+const deleteIssue = async (req: Request, res: Response) => {
+  await issueService.deleteIssueFromDB(req.params.id as string);
 
   res.json({
     success: true,
