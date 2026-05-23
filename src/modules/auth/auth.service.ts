@@ -13,31 +13,22 @@ const createUser = async (payload: IUser) => {
     VALUES ($1, $2, $3, $4)
     RETURNING id, name, email, role, created_at, updated_at
     `,
-    [
-      payload.name,
-      payload.email,
-      hashed,
-      payload.role || "contributor",
-    ]
+    [payload.name, payload.email, hashed, payload.role || "contributor"],
   );
 
   return result.rows[0];
 };
 
 const loginUser = async (email: string, password: string) => {
-  const userResult = await pool.query(
-    `SELECT * FROM users WHERE email = $1`,
-    [email]
-  );
+  const userResult = await pool.query(`SELECT * FROM users WHERE email = $1`, [
+    email,
+  ]);
 
   const user = userResult.rows[0];
 
   if (!user) throw new Error("User not found");
 
-  const match = await bcrypt.compare(
-    password,
-    user.password
-  );
+  const match = await bcrypt.compare(password, user.password);
 
   if (!match) throw new Error("Invalid password");
 
@@ -48,7 +39,7 @@ const loginUser = async (email: string, password: string) => {
       role: user.role,
     },
     config.jwt_secret,
-    { expiresIn: "1d" }
+    { expiresIn: "1d" },
   );
 
   return {
@@ -58,6 +49,8 @@ const loginUser = async (email: string, password: string) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
     },
   };
 };

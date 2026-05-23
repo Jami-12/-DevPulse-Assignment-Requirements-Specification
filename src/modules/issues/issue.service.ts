@@ -2,28 +2,26 @@ import { pool } from "../../db/db";
 import type { IIssue } from "./issue.interface";
 
 const createIssueIntoDB = async (data: IIssue) => {
+  const { title, description, type, status, reporter_id } = data;
+  if (!data.type) {
+    throw new Error("Type must be provide");
+  }
   const result = await pool.query(
     `
     INSERT INTO issues (title, description, type, status, reporter_id)
     VALUES ($1,$2,$3,$4,$5)
     RETURNING *
     `,
-    [
-      data.title,
-      data.description,
-      data.type,
-      data.status || "open",
-      data.reporter_id,
-    ]
+    [title, description, type, status || "open", reporter_id],
   );
 
   return result.rows[0];
 };
-
 const getAllIssuesFromDB = async (query: any) => {
   const { sort = "newest", type, status } = query;
 
   let sql = `SELECT * FROM issues`;
+
   const values: any[] = [];
   const conditions: string[] = [];
 
@@ -51,47 +49,72 @@ const getAllIssuesFromDB = async (query: any) => {
   const issuesRes = await pool.query(sql, values);
   const issues = issuesRes.rows;
 
-  const ids = [
-    ...new Set(issues.map((i) => i.reporter_id)),
-  ];
+  if (!issues.length) {
+    return [];
+  }
+
+  const ids = [...new Set(issues.map((i) => i.reporter_id))];
 
   const usersRes = await pool.query(
     `SELECT id, name, role FROM users WHERE id = ANY($1)`,
-    [ids]
+    [ids],
   );
 
-  return issues.map((issue) => ({
-    ...issue,
-    reporter: usersRes.rows.find(
-      (u) => u.id === issue.reporter_id
-    ),
-  }));
+  return issues.map((issue) => {
+    const reporterObj =
+      usersRes.rows.find((u) => u.id === issue.reporter_id) || null;
+    const { id, title, description, type, status, created_at, updated_at } =
+      issue as any;
+
+    const createTime =
+      created_at instanceof Date ? created_at.toISOString() : created_at;
+    const updateTime =
+      updated_at instanceof Date ? updated_at.toISOString() : updated_at;
+
+    return {
+      id,
+      title,
+      description,
+      type,
+      status,
+      reporter: reporterObj,
+      created_at: createTime,
+      updated_at: updateTime,
+    };
+  });
 };
 
 const getSingleIssueFromDB = async (id: string) => {
-  const issueRes = await pool.query(
-    `SELECT * FROM issues WHERE id=$1`,
-    [id]
-  );
+  const issueRes = await pool.query(`SELECT * FROM issues WHERE id=$1`, [id]);
 
   const issue = issueRes.rows[0];
+
   if (!issue) return null;
 
   const userRes = await pool.query(
     `SELECT id,name,role FROM users WHERE id=$1`,
-    [issue.reporter_id]
+    [issue.reporter_id],
   );
 
   return {
-    ...issue,
-    reporter: userRes.rows[0],
+    id: issue.id,
+    title: issue.title,
+    description: issue.description,
+    type: issue.type,
+    status: issue.status,
+
+    reporter: {
+      id: userRes.rows[0].id,
+      name: userRes.rows[0].name,
+      role: userRes.rows[0].role,
+    },
+
+    created_at: issue.created_at,
+    updated_at: issue.updated_at,
   };
 };
 
-const updateIssueIntoDB = async (
-  id: string,
-  payload: any
-) => {
+const updateIssueIntoDB = async (id: string, payload: any) => {
   const old = await getSingleIssueFromDB(id);
 
   const result = await pool.query(
@@ -105,22 +128,14 @@ const updateIssueIntoDB = async (
     WHERE id=$5
     RETURNING *
     `,
-    [
-      payload.title || old.title,
-      payload.description || old.description,
-      payload.type || old.type,
-      payload.status || old.status,
-      id,
-    ]
+    [payload.title, payload.description, payload.type, payload.status, id],
   );
 
   return result.rows[0];
 };
 
 const deleteIssueFromDB = async (id: string) => {
-  await pool.query(`DELETE FROM issues WHERE id=$1`, [
-    id,
-  ]);
+  await pool.query(`DELETE FROM issues WHERE id=$1`, [id]);
 
   return true;
 };

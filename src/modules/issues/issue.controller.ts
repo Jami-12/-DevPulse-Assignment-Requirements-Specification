@@ -17,9 +17,7 @@ const createIssue = async (req: Request, res: Response) => {
 };
 
 const getAllIssues = async (req: Request, res: Response) => {
-  const data = await issueService.getAllIssuesFromDB(
-    req.query
-  );
+  const data = await issueService.getAllIssuesFromDB(req.query);
 
   res.json({
     success: true,
@@ -28,10 +26,7 @@ const getAllIssues = async (req: Request, res: Response) => {
 };
 
 const getSingleIssue = async (req: Request, res: Response) => {
-  const data = await issueService.getSingleIssueFromDB(
-    req.params.id as string
-  );
-
+  const data = await issueService.getSingleIssueFromDB(req.params.id as string);
   if (!data) {
     return res.status(404).json({
       success: false,
@@ -49,7 +44,7 @@ const updateIssue = async (req: Request, res: Response) => {
   const user = (req as any).user;
 
   const issue = await issueService.getSingleIssueFromDB(
-    req.params.id as string
+    req.params.id as string,
   );
 
   if (!issue) {
@@ -61,21 +56,18 @@ const updateIssue = async (req: Request, res: Response) => {
 
   if (
     user.role === "contributor" &&
-    (issue.reporter_id !== user.id ||
-      issue.status !== "open")
+    (issue.reporter.id !== user.id || issue.status !== "open")
   ) {
     return res.status(403).json({
       success: false,
-      message:
-        "You can only update your own open issues",
+      message: "You can only update your own open issues",
     });
   }
 
-  const updated =
-    await issueService.updateIssueIntoDB(
-      req.params.id as string,
-      req.body
-    );
+  const updated = await issueService.updateIssueIntoDB(
+    req.params.id as string,
+    req.body,
+  );
 
   res.json({
     success: true,
